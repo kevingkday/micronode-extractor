@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  micronode-extractor:
+    build: .
+    ports:
+      - "5005:5005"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434/api/generate
+      - API_KEY=micronode-secret-key
+    restart: unless-stopped
