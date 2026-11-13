@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCEAN FALLS // MICRONODE CONTROL CENTER</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    :root {
+      --accent: #06b6d4;
+      --accent-glow: rgba(6, 182, 212, 0.35);
+      --accent-soft: rgba(6, 182, 212, 0.12);
+    }
+    body.night-shift {
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --accent-soft: rgba(245, 158, 11, 0.12);
+    }
+    body {
+      background-color: #070b12;
+      background-image:
+        radial-gradient(circle at 15% 15%, var(--accent-soft), transparent 40%),
+        linear-gradient(to right, rgba(30, 41, 59, 0.2) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.2) 1px, transparent 1px);
+      background-size: 100% 100%, 36px 36px, 36px 36px;
+      color: #e2e8f0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .panel {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+    }
+    .accent-border {
+      border-color: var(--accent);
+      box-shadow: 0 0 18px var(--accent-glow);
+    }
+    .accent-text {
+      color: var(--accent);
+    }
+    .toggle-track {
+      width: 52px;
+      height: 26px;
+      border-radius: 9999px;
+      background: #1e293b;
+      border: 1px solid #475569;
+      position: relative;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .toggle-track.on {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #10b981;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+    }
+    .toggle-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 9999px;
+      background: #94a3b8;
+      position: absolute;
+      top: 3px;
+      left: 4px;
+      transition: all 0.2s ease;
+    }
+    .toggle-track.on .toggle-thumb {
+      transform: translateX(25px);
+      background: #10b981;
+    }
+    @keyframes packetTravel {
+      0% { left: 4%; opacity: 0; }
+      15% { opacity: 1; }
+      85% { opacity: 1; }
+      100% { left: 92%; opacity: 0; }
+    }
+    .packet-dot {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 9999px;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: packetTravel 1.1s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 transition-colors duration-300">
+  <div class="max-w-7xl mx-auto space-y-5">
+
+    <!-- Header Bar -->
+    <header class="panel rounded-xl px-5 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-t-2" style="border-top-color: var(--accent);">
+      <div>
+        <div class="flex items-center gap-3">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" id="header-pulse"></span>
+          <h1 class="text-lg md:text-xl font-bold tracking-wider uppercase text-slate-100">
+            OCEAN FALLS // MICRONODE CONTROL CENTER
+          </h1>
+        </div>
+        <div class="mt-1 flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400">
+          <span>NODE ID: <strong class="text-slate-200">MICRONODE-BC-01</strong></span>
+          <span>•</span>
+          <span id="gpu-name-label">GPU: Detecting...</span>
+          <span>•</span>
+          <span id="ws-status" class="text-amber-400">WS: CONNECTING</span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="px-3 py-1.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>SOVEREIGN BOUNDARY LOCKED (BC, CANADA)</span>
+        </div>
+        <div class="px-3 py-1.5 rounded-full bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs font-mono">
+          0 B EXTERNAL EGRESS
+        </div>
+      </div>
+    </header>
+
+    <!-- Row 1: Physical Hardware Dials & Gauges -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div class="panel rounded-xl p-4">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-xs font-mono uppercase tracking-wider text-slate-400">GPU Core Temp</span>
+          <span class="text-xs font-mono text-slate-300" id="val-temp">-- °C</span>
+        </div>
+        <div id="gauge-temp" class="w-full h-48"></div>
+      </div>
+
+      <div class="panel rounded-xl p-4">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-xs font-mono uppercase tracking-wider text-slate-400">GPU Compute Load</span>
+          <span class="text-xs font-mono text-slate-300" id="val-util">-- %</span>
+        </div>
+        <div id="gauge-util" class="w-full h-48"></div>
+      </div>
+
+      <div class="panel rounded-xl p-4">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-xs font-mono uppercase tracking-wider text-slate-400">VRAM Allocation</span>
+          <span class="text-xs font-mono text-slate-300" id="val-vram">-- / -- GB</span>
+        </div>
+        <div id="gauge-vram" class="w-full h-48"></div>
+      </div>
+
+      <div class="panel rounded-xl p-4">
+        <div class="flex justify-between items-center mb-1">
+          <span class="text-xs font-mono uppercase tracking-wider text-slate-400">Board Power Draw</span>
+          <span class="text-xs font-mono text-slate-300" id="val-power">-- W</span>
+        </div>
+        <div id="gauge-power" class="w-full h-48"></div>
+      </div>
+    </section>
+
+    <!-- Row 2: Container Controls & Active Model Router -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+      <!-- Left Panel: Service & Container Toggle Switches -->
+      <div class="lg:col-span-5 panel rounded-xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-mono uppercase tracking-wider text-slate-200">
+              Service &amp; Container Switches
+            </h2>
+            <button onclick="fetchContainers()" class="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300">
+              Refresh
+            </button>
+          </div>
+          <div id="container-list" class="space-y-3">
+            <div class="text-xs font-mono text-slate-500">Querying Docker engine...</div>
+          </div>
+        </div>
+        <div id="docker-status-note" class="mt-4 pt-3 border-t border-slate-800 text-[11px] font-mono text-slate-400">
+          Connected via /var/run/docker.sock
+        </div>
+      </div>
+
+      <!-- Right Panel: Active Model & Task Router Controls -->
+      <div class="lg:col-span-7 panel rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-mono uppercase tracking-wider text-slate-200">
+            Active Model &amp; Task Router Controls
+          </h2>
+          <button onclick="fetchModels()" class="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300">
+            Sync VRAM
+          </button>
+        </div>
+
+        <div id="model-cards" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="text-xs font-mono text-slate-500 col-span-3">Querying Ollama VRAM state...</div>
+        </div>
+
+        <!-- Live Route Test Bar -->
+        <div class="rounded-lg bg-slate-950/80 border border-slate-800 p-4 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono uppercase text-slate-400">Target Alias:</span>
+              <select id="ping-model-select" class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-slate-200">
+                <option value="micronode-chat">micronode-chat</option>
+                <option value="micronode-decision">micronode-decision</option>
+                <option value="micronode-vision">micronode-vision</option>
+              </select>
+            </div>
+            <button id="ping-test-btn" onclick="runRouteTest()" class="px-4 py-1.5 rounded text-xs font-mono font-semibold uppercase tracking-wider bg-cyan-600 hover:bg-cyan-500 text-slate-950 transition">
+              Run Live Route Test
+            </button>
+          </div>
+
+          <!-- Animated Packet Trace -->
+          <div class="relative flex items-center justify-between px-3 py-2.5 rounded bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-slate-300 overflow-hidden">
+            <span class="z-10 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">Gateway :8000</span>
+            <span class="z-10 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">Smart Router :4000</span>
+            <span class="z-10 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">RTX 5080 (Local)</span>
+            <div class="absolute inset-x-6 top-1/2 h-px bg-slate-700 -translate-y-1/2"></div>
+            <div id="packet-anim" class="packet-dot hidden"></div>
+          </div>
+
+          <div id="ping-result" class="text-xs font-mono text-slate-400 min-h-[1.25rem]">
+            Ready for sovereign inference verification.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Row 3: Master Operating Mode Switch -->
+    <section id="mode-panel" class="panel rounded-xl p-5 accent-border transition-all duration-300">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div class="space-y-1">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">
+            Master Operating Mode Switch
+          </div>
+          <h2 id="mode-title" class="text-lg font-bold tracking-wide text-cyan-300">
+            DAYTIME SOVEREIGN MODE — PRIVATE CLIENT INFERENCE ACTIVE
+          </h2>
+          <p id="mode-subtitle" class="text-xs font-mono text-slate-400">
+            0 Bytes External Egress • Dedicated Local VRAM Isolation • BC Sovereign Boundary Locked
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div class="px-4 py-2.5 rounded-lg bg-slate-950/90 border border-slate-800 text-xs font-mono">
+            <div class="text-slate-400">PROJECTED OFFSET REVENUE ($0.40/GPU-HR)</div>
+            <div class="text-base font-bold text-emerald-400 mt-0.5" id="mode-revenue">
+              $120.00 / mo <span class="text-[11px] font-normal text-slate-400">(10h Night-Shift)</span>
+            </div>
+          </div>
+
+          <button id="mode-rocker-btn" onclick="toggleOperatingMode()" class="px-5 py-3 rounded-lg font-mono text-xs font-bold uppercase tracking-wider border transition bg-cyan-500/20 border-cyan-400 text-cyan-200 hover:bg-cyan-500/30">
+            Engage Night-Shift Federation
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // --- Apache ECharts Gauges ---
+    const gaugeTemp = echarts.init(document.getElementById('gauge-temp'));
+    const gaugeUtil = echarts.init(document.getElementById('gauge-util'));
+    const gaugeVram = echarts.init(document.getElementById('gauge-vram'));
+    const gaugePower = echarts.init(document.getElementById('gauge-power'));
+
+    function makeGaugeOption(unit, min, max, colorStops, detailFormatter) {
+      return {
+        series: [{
+          type: 'gauge',
+          min,
+          max,
+          splitNumber: 4,
+          radius: '92%',
+          center: ['50%', '58%'],
+          startAngle: 205,
+          endAngle: -25,
+          axisLine: {
+            lineStyle: {
+              width: 12,
+              color: colorStops
+            }
+          },
+          pointer: {
+            itemStyle: { color: '#e2e8f0' },
+            length: '58%',
+            width: 4
+          },
+          axisTick: { distance: -12, length: 6, lineStyle: { color: '#94a3b8', width: 1 } },
+          splitLine: { distance: -14, length: 12, lineStyle: { color: '#cbd5e1', width: 2 } },
+          axisLabel: { color: '#94a3b8', distance: 16, fontSize: 10 },
+          detail: {
+            valueAnimation: true,
+            formatter: detailFormatter || `{value} ${unit}`,
+            color: '#f8fafc',
+            fontSize: 18,
+            fontFamily: 'monospace',
+            offsetCenter: [0, '42%']
+          },
+          data: [{ value: 0 }]
+        }]
+      };
+    }
+
+    gaugeTemp.setOption(makeGaugeOption('°C', 0, 100, [[0.65, '#10b981'], [0.82, '#f59e0b'], [1, '#ef4444']]));
+    gaugeUtil.setOption(makeGaugeOption('%', 0, 100, [[0.6, '#06b6d4'], [0.85, '#3b82f6'], [1, '#a855f7']]));
+    gaugeVram.setOption(makeGaugeOption('GB', 0, 16, [[0.6, '#06b6d4'], [0.85, '#f59e0b'], [1, '#ef4444']], v => `${v.toFixed(1)} GB`));
+    gaugePower.setOption(makeGaugeOption('W', 0, 360, [[0.6, '#10b981'], [0.85, '#f59e0b'], [1, '#ef4444']]));
+
+    window.addEventListener('resize', () => {
+      gaugeTemp.resize();
+      gaugeUtil.resize();
+      gaugeVram.resize();
+      gaugePower.resize();
+    });
+
+    // --- Live Telemetry WebSocket ---
+    function connectTelemetryWS() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${proto}//${location.host}/ws/telemetry`);
+      const wsLabel = document.getElementById('ws-status');
+
+      ws.onopen = () => {
+        wsLabel.textContent = 'WS: LIVE (1.5s)';
+        wsLabel.className = 'text-emerald-400';
+      };
+
+      ws.onmessage = (event) => {
+        const d = JSON.parse(event.data);
+        document.getElementById('gpu-name-label').textContent = `GPU: ${d.gpu_name}`;
+        document.getElementById('val-temp').textContent = `${d.temp_c} °C`;
+        document.getElementById('val-util').textContent = `${d.gpu_util_percent} %`;
+
+        const vramUsedGb = +(d.vram_used_mb / 1024).toFixed(2);
+        const vramTotalGb = Math.max(Math.round(d.vram_total_mb / 1024), 16);
+        document.getElementById('val-vram').textContent = `${d.vram_used_mb.toFixed(0)} MB (${vramUsedGb.toFixed(1)}/${vramTotalGb} GB)`;
+
+        const powerLimit = Math.max(Math.round(d.power_limit_w || 360), 100);
+        document.getElementById('val-power').textContent = `${d.power_draw_w.toFixed(0)} / ${powerLimit} W`;
+
+        gaugeTemp.setOption({ series: [{ data: [{ value: d.temp_c }] }] });
+        gaugeUtil.setOption({ series: [{ data: [{ value: d.gpu_util_percent }] }] });
+        gaugeVram.setOption({ series: [{ max: vramTotalGb, data: [{ value: vramUsedGb }] }] });
+        gaugePower.setOption({ series: [{ max: powerLimit, data: [{ value: d.power_draw_w }] }] });
+      };
+
+      ws.onclose = () => {
+        wsLabel.textContent = 'WS: RECONNECTING...';
+        wsLabel.className = 'text-amber-400';
+        setTimeout(connectTelemetryWS, 2000);
+      };
+    }
+
+    // --- Docker Container Controls ---
+    async function fetchContainers() {
+      const listEl = document.getElementById('container-list');
+      const noteEl = document.getElementById('docker-status-note');
+      try {
+        const res = await fetch('/api/containers');
+        const data = await res.json();
+        noteEl.textContent = data.docker_connected
+          ? 'Docker Engine: Connected via /var/run/docker.sock'
+          : `Docker Engine: Unavailable (${data.error || 'socket error'})`;
+
+        listEl.innerHTML = data.services.map(svc => {
+          const isRunning = svc.status === 'running';
+          const statusColor = isRunning
+            ? 'text-emerald-400'
+            : svc.found ? 'text-amber-400' : 'text-slate-500';
+          const action = isRunning ? 'stop' : 'start';
+          return `
+            <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+              <div>
+                <div class="text-xs font-semibold text-slate-200">${svc.label}</div>
+                <div class="text-[11px] font-mono ${statusColor} uppercase">${svc.status}</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  onclick="toggleContainer('${svc.name}', '${action}')"
+                  ${!svc.found ? 'disabled title="Container not present"' : ''}
+                  class="toggle-track ${isRunning ? 'on' : ''} ${!svc.found ? 'opacity-40 cursor-not-allowed' : ''}">
+                  <span class="toggle-thumb"></span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        listEl.innerHTML = `<div class="text-xs font-mono text-rose-400">Failed to load containers: ${err}</div>`;
+      }
+    }
+
+    async function toggleContainer(name, action) {
+      try {
+        await fetch(`/api/containers/${encodeURIComponent(name)}/${action}`, { method: 'POST' });
+        await fetchContainers();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- Ollama Active Model & VRAM Controls ---
+    async function fetchModels() {
+      const el = document.getElementById('model-cards');
+      try {
+        const res = await fetch('/api/models');
+        const data = await res.json();
+        el.innerHTML = data.models.map(m => {
+          const vramBadge = m.in_vram
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.4)]">● IN VRAM (${m.size_vram_mb} MB)</span>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">COLD / DISK</span>`;
+          return `
+            <div class="rounded-lg p-3 bg-slate-900/80 border ${m.in_vram ? 'border-emerald-500/60' : 'border-slate-800'} flex flex-col justify-between gap-3">
+              <div>
+                <div class="flex items-center justify-between gap-1 mb-1.5">
+                  <span class="text-xs font-mono font-bold accent-text">${m.alias}</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-300">${m.ollama_model}</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${m.role}</div>
+                <div class="mt-2">${vramBadge}</div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="manageModel('${m.ollama_model}', 'load')" class="flex-1 py-1 rounded text-[11px] font-mono bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 text-cyan-200">
+                  Load
+                </button>
+                <button onclick="manageModel('${m.ollama_model}', 'unload')" class="flex-1 py-1 rounded text-[11px] font-mono bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/40 text-rose-200">
+                  Evict
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        el.innerHTML = `<div class="text-xs font-mono text-rose-400 col-span-3">Ollama query error: ${err}</div>`;
+      }
+    }
+
+    async function manageModel(model, action) {
+      const resEl = document.getElementById('ping-result');
+      resEl.textContent = `${action === 'load' ? 'Loading' : 'Evicting'} ${model} in VRAM...`;
+      await fetch('/api/models/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, action })
+      });
+      await fetchModels();
+      resEl.textContent = `Model ${model} ${action === 'load' ? 'warmed into VRAM' : 'evicted from VRAM'}.`;
+    }
+
+    // --- Live Route Test ---
+    async function runRouteTest() {
+      const model = document.getElementById('ping-model-select').value;
+      const packet = document.getElementById('packet-anim');
+      const resEl = document.getElementById('ping-result');
+      const btn = document.getElementById('ping-test-btn');
+
+      packet.classList.remove('hidden');
+      btn.disabled = true;
+      resEl.textContent = `Routing test prompt to ${model} via LiteLLM (:4000)...`;
+
+      try {
+        const res = await fetch('/api/ping-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Test failed');
+        resEl.innerHTML = `<span class="text-emerald-400 font-semibold">PASS</span> • ${data.model} • <strong>${data.latency_ms} ms</strong> • <strong>${data.tokens_per_sec} tok/s</strong> • ${data.sovereign_confirmation} <span class="text-slate-500">("${data.reply}")</span>`;
+        await fetchModels();
+      } catch (err) {
+        resEl.innerHTML = `<span class="text-rose-400">ERROR:</span> ${err.message}`;
+      } finally {
+        packet.classList.add('hidden');
+        btn.disabled = false;
+      }
+    }
+
+    // --- Operating Mode Toggle ---
+    function applyModeUI(data) {
+      const isNight = data.mode === 'NIGHT_SHIFT';
+      document.body.classList.toggle('night-shift', isNight);
+
+      const title = document.getElementById('mode-title');
+      const sub = document.getElementById('mode-subtitle');
+      const btn = document.getElementById('mode-rocker-btn');
+      const pulse = document.getElementById('header-pulse');
+
+      if (isNight) {
+        title.textContent = 'NIGHT-SHIFT FEDERATION MODE — IDLE COMPUTE YIELD ACTIVE';
+        title.className = 'text-lg font-bold tracking-wide text-amber-300';
+        const purgedText = data.purged_models && data.purged_models.length
+          ? `Purged private VRAM models: ${data.purged_models.join(', ')}`
+          : 'Private VRAM models purged (0 residual weights)';
+        sub.textContent = `${purgedText} • Earning $0.40/GPU-hr Federated Yield`;
+        btn.textContent = 'Return to Daytime Sovereign';
+        btn.className = 'px-5 py-3 rounded-lg font-mono text-xs font-bold uppercase tracking-wider border transition bg-emerald-500/20 border-emerald-400 text-emerald-200 hover:bg-emerald-500/30';
+        pulse.className = 'inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+      } else {
+        title.textContent = 'DAYTIME SOVEREIGN MODE — PRIVATE CLIENT INFERENCE ACTIVE';
+        title.className = 'text-lg font-bold tracking-wide text-cyan-300';
+        sub.textContent = '0 Bytes External Egress • Dedicated Local VRAM Isolation • BC Sovereign Boundary Locked';
+        btn.textContent = 'Engage Night-Shift Federation';
+        btn.className = 'px-5 py-3 rounded-lg font-mono text-xs font-bold uppercase tracking-wider border transition bg-cyan-500/20 border-cyan-400 text-cyan-200 hover:bg-cyan-500/30';
+        pulse.className = 'inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse';
+      }
+    }
+
+    async function fetchMode() {
+      const res = await fetch('/api/mode');
+      applyModeUI(await res.json());
+    }
+
+    async function toggleOperatingMode() {
+      const res = await fetch('/api/mode', { method: 'POST' });
+      applyModeUI(await res.json());
+      await fetchModels();
+    }
+
+    // Boot
+    connectTelemetryWS();
+    fetchContainers();
+    fetchModels();
+    fetchMode();
+    setInterval(fetchContainers, 8000);
+    setInterval(fetchModels, 8000);
+  </script>
+</body>
+</html>
